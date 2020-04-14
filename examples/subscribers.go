@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"flag"
 	"os"
 	"os/signal"
 	"sync"
@@ -10,9 +10,14 @@ import (
 
 	"github.com/godbus/dbus"
 	"github.com/ldx/go-geoclue2"
+	"k8s.io/klog"
 )
 
 func main() {
+	workers := flag.Int("workers", 3, "Number of workers receiving updates")
+	klog.InitFlags(nil)
+	flag.Parse()
+
 	conn, err := dbus.SystemBus()
 	if err != nil {
 		panic(err)
@@ -23,15 +28,16 @@ func main() {
 	gc2.Start()
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
+	ctx, cancel := context.WithCancel(context.Background())
+	for i := 0; i < *workers; i++ {
 		go func(j int) {
 			wg.Add(1)
 			defer wg.Done()
-			loc, err := gc2.WaitForLocation(context.TODO())
+			loc, err := gc2.WaitForLocation(ctx)
 			if err != nil {
-				fmt.Printf("waiting for location (client %d): %v\n", j, err)
+				klog.Infof("waiting for location (client %d): %v\n", j, err)
 			}
-			fmt.Printf("location update (client %d): %+v\n", j, loc)
+			klog.Infof("location update (client %d): %+v\n", j, loc)
 		}(i)
 	}
 
@@ -46,6 +52,7 @@ func main() {
 	for {
 		select {
 		case <-sig:
+			cancel()
 			gc2.Stop()
 			return
 		case <-done:
