@@ -25,7 +25,7 @@ const (
 	managerPath       = "/org/freedesktop/GeoClue2/Manager"
 )
 
-// This is the location as returned by GeoClue2.
+// Location contains location information returned by geoclue2.
 type Location struct {
 	// The latitude of the location, in degrees.
 	Latitude float64 `dbus:"Latitude"`
@@ -59,6 +59,8 @@ type Location struct {
 	Timestamp []uint64 `dbus:"Timestamp"`
 }
 
+// GeoClue2 is used for receiving location information from the geoclue2
+// service.
 type GeoClue2 struct {
 	conn           *dbus.Conn
 	desktopID      string
@@ -71,6 +73,7 @@ type GeoClue2 struct {
 	latestLocation *Location
 }
 
+// NewGeoClue2 is used to create a new GeoClue2 struct.
 func NewGeoClue2(conn *dbus.Conn, desktopID string) *GeoClue2 {
 	if desktopID == "" {
 		desktopID = defaultDesktopID
@@ -86,11 +89,13 @@ func NewGeoClue2(conn *dbus.Conn, desktopID string) *GeoClue2 {
 	}
 }
 
+// Start starts the main loop that receives and distributes location updates.
 func (g *GeoClue2) Start() {
 	klog.V(2).Infof("starting up")
 	go g.controlLoop()
 }
 
+// Stop stops the main loop and waits until it has shut down.
 func (g *GeoClue2) Stop() {
 	klog.V(5).Infof("stop requested")
 	g.quit <- struct{}{}
@@ -188,10 +193,12 @@ func (g *GeoClue2) processLocationUpdate() *Location {
 	return &location
 }
 
+// GetLatestLocation returns the last location received from geoclue2.
 func (g *GeoClue2) GetLatestLocation() *Location {
 	return g.latestLocation
 }
 
+// WaitForLocation waits for the next location update.
 func (g *GeoClue2) WaitForLocation(ctx context.Context) (*Location, error) {
 	ch := make(chan Location)
 	g.subscribe <- ch
@@ -209,7 +216,7 @@ func (g *GeoClue2) WaitForLocation(ctx context.Context) (*Location, error) {
 
 func (g *GeoClue2) broadcastUpdate(subscribers map[chan<- Location]interface{}, loc Location) {
 	klog.V(5).Infof("broadcasting location update")
-	for ch, _ := range subscribers {
+	for ch := range subscribers {
 		select {
 		case ch <- loc:
 		default:
@@ -242,7 +249,7 @@ func (g *GeoClue2) controlLoop() {
 			}
 		case <-g.quit:
 			klog.V(2).Infof("shutting down")
-			for sub, _ := range subscribers {
+			for sub := range subscribers {
 				close(sub)
 			}
 			return
