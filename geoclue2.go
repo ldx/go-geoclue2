@@ -244,6 +244,9 @@ func (g *GeoClue2) controlLoop() {
 			}
 		case <-g.quit:
 			klog.V(2).Infof("shutting down")
+			for sub, _ := range subscribers {
+				close(sub)
+			}
 			return
 		}
 	}
