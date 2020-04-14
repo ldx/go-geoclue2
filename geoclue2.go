@@ -88,10 +88,12 @@ func NewGeoClue2(conn *dbus.Conn, desktopID string) *GeoClue2 {
 }
 
 func (g *GeoClue2) Start() {
+	klog.V(2).Infof("starting up")
 	go g.controlLoop()
 }
 
 func (g *GeoClue2) Stop() {
+	klog.V(5).Infof("stop requested")
 	g.quit <- struct{}{}
 	g.wg.Wait()
 }
@@ -204,6 +206,7 @@ func (g *GeoClue2) WaitForLocation(ctx context.Context) (*Location, error) {
 }
 
 func (g *GeoClue2) broadcastUpdate(subscribers map[chan<- Location]interface{}, loc Location) {
+	klog.V(5).Infof("broadcasting location update")
 	for ch, _ := range subscribers {
 		select {
 		case ch <- loc:
@@ -215,20 +218,20 @@ func (g *GeoClue2) broadcastUpdate(subscribers map[chan<- Location]interface{}, 
 func (g *GeoClue2) controlLoop() {
 	g.wg.Add(1)
 	defer g.wg.Done()
-	klog.V(2).Infof("starting up")
 	subscribers := make(map[chan<- Location]interface{})
 	for {
 		g.ensureClient()
 		select {
 		case subscribe := <-g.subscribe:
-			klog.V(5).Infof("new subscriber")
+			klog.V(5).Infof("new subscriber %v", subscribe)
 			subscribers[subscribe] = ""
 		case unsubscribe := <-g.unsubscribe:
-			klog.V(5).Infof("subscriber gone")
+			klog.V(5).Infof("subscriber %v gone", unsubscribe)
 			delete(subscribers, unsubscribe)
 		case sig := <-g.dbusCh:
 			klog.V(5).Infof("dbus signal %s", sig.Name)
 			if sig.Name == locationUpdated {
+				klog.V(5).Infof("got location update")
 				loc := g.processLocationUpdate()
 				if loc != nil {
 					g.latestLocation = loc
