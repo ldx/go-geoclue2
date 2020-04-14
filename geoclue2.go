@@ -1,14 +1,9 @@
-package main
+package geoclue2
 
 import (
 	"context"
-	"math/rand"
-	"os"
-	"os/signal"
 	"reflect"
 	"sync"
-	"syscall"
-	"time"
 
 	"github.com/godbus/dbus"
 	"k8s.io/klog"
@@ -220,6 +215,7 @@ func (g *GeoClue2) broadcastUpdate(subscribers map[chan<- Location]interface{}, 
 func (g *GeoClue2) controlLoop() {
 	g.wg.Add(1)
 	defer g.wg.Done()
+	klog.V(2).Infof("starting up")
 	subscribers := make(map[chan<- Location]interface{})
 	for {
 		g.ensureClient()
@@ -242,32 +238,6 @@ func (g *GeoClue2) controlLoop() {
 		case <-g.quit:
 			klog.V(2).Infof("shutting down")
 			return
-		}
-	}
-}
-
-func main() {
-	conn, err := dbus.SystemBus()
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
-
-	gc2 := NewGeoClue2(conn, "")
-	gc2.Start()
-
-	ch := make(chan os.Signal)
-	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
-	for {
-		t := rand.Intn(100)
-		select {
-		case <-ch:
-			gc2.Stop()
-			return
-		case <-time.After(time.Duration(t) * time.Second):
-			loc := gc2.GetLatestLocation()
-			klog.Infof("latest location: %+v", loc)
-			continue
 		}
 	}
 }
