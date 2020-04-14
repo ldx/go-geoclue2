@@ -2,6 +2,7 @@ package geoclue2
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -197,7 +198,10 @@ func (g *GeoClue2) WaitForLocation(ctx context.Context) (*Location, error) {
 	ch := make(chan Location)
 	g.subscribe <- ch
 	select {
-	case loc := <-ch:
+	case loc, ok := <-ch:
+		if !ok {
+			return nil, fmt.Errorf("receiver loop shutting down")
+		}
 		g.unsubscribe <- ch
 		return &loc, nil
 	case <-ctx.Done():
