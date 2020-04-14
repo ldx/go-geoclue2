@@ -64,7 +64,7 @@ type GeoClue2 struct {
 	desktopID      string
 	wg             sync.WaitGroup
 	quit           chan interface{}
-	dbusCh         chan *dbus.Signal
+	dbus           chan *dbus.Signal
 	subscribe      chan chan Location
 	unsubscribe    chan chan Location
 	client         dbus.BusObject
@@ -75,14 +75,12 @@ func NewGeoClue2(conn *dbus.Conn, desktopID string) *GeoClue2 {
 	if desktopID == "" {
 		desktopID = defaultDesktopID
 	}
-	dbusCh := make(chan *dbus.Signal)
-	conn.Signal(dbusCh)
 	return &GeoClue2{
 		conn:        conn,
 		desktopID:   desktopID,
 		wg:          sync.WaitGroup{},
 		quit:        make(chan interface{}),
-		dbusCh:      dbusCh,
+		dbus:        make(chan *dbus.Signal),
 		subscribe:   make(chan chan Location),
 		unsubscribe: make(chan chan Location),
 	}
@@ -222,6 +220,7 @@ func (g *GeoClue2) broadcastUpdate(subscribers map[chan<- Location]interface{}, 
 func (g *GeoClue2) controlLoop() {
 	g.wg.Add(1)
 	defer g.wg.Done()
+	g.conn.Signal(g.dbus)
 	subscribers := make(map[chan<- Location]interface{})
 	for {
 		g.ensureClient()
@@ -232,8 +231,7 @@ func (g *GeoClue2) controlLoop() {
 		case unsubscribe := <-g.unsubscribe:
 			klog.V(5).Infof("subscriber %v gone", unsubscribe)
 			delete(subscribers, unsubscribe)
-		case sig := <-g.dbusCh:
-			klog.V(5).Infof("dbus signal %s", sig.Name)
+		case sig := <-g.dbus:
 			if sig.Name == locationUpdated {
 				klog.V(5).Infof("got location update")
 				loc := g.processLocationUpdate()
