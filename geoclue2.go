@@ -145,7 +145,7 @@ func (g *GeoClue2) getClient() error {
 	return nil
 }
 
-func (g *GeoClue2) getObjInto(intf string, obj dbus.BusObject, into interface{}) error {
+func getObjInto(intf string, obj dbus.BusObject, into interface{}) error {
 	s := reflect.ValueOf(into).Elem()
 	t := s.Type()
 	for i := 0; i < t.NumField(); i++ {
@@ -186,7 +186,7 @@ func (g *GeoClue2) processLocationUpdate() *Location {
 	path := val.Value().(dbus.ObjectPath)
 	obj := g.conn.Object("org.freedesktop.GeoClue2", path)
 	location := Location{}
-	err = g.getObjInto(locationInterface, obj, &location)
+	err = getObjInto(locationInterface, obj, &location)
 	if err != nil {
 		klog.Warningf("getting location object from update: %v", err)
 		return nil
