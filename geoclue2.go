@@ -92,6 +92,7 @@ func NewGeoClue2(conn *dbus.Conn, desktopID string) *GeoClue2 {
 // Start starts the main loop that receives and distributes location updates.
 func (g *GeoClue2) Start() {
 	klog.V(2).Infof("starting up")
+	g.conn.Signal(g.dbus)
 	go g.controlLoop()
 }
 
@@ -227,7 +228,6 @@ func (g *GeoClue2) broadcastUpdate(subscribers map[chan<- Location]interface{}, 
 func (g *GeoClue2) controlLoop() {
 	g.wg.Add(1)
 	defer g.wg.Done()
-	g.conn.Signal(g.dbus)
 	subscribers := make(map[chan<- Location]interface{})
 	for {
 		g.ensureClient()
