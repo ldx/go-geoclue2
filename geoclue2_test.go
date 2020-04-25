@@ -2,6 +2,7 @@ package geoclue2
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -13,7 +14,7 @@ const (
 	clientPathPrefix = "/org/freedesktop/GeoClue2/Client/"
 )
 
-func body(elements []string) []interface{} {
+func body(elements ...interface{}) []interface{} {
 	ret := make([]interface{}, len(elements))
 	for i, e := range elements {
 		ret[i] = e
@@ -32,7 +33,7 @@ func TestGetClient(t *testing.T) {
 				Args:        nil,
 				Done:        nil,
 				Err:         nil,
-				Body:        body([]string{"/org/freedesktop/GeoClue2/Client/10"}),
+				Body:        body("/org/freedesktop/GeoClue2/Client/10"),
 			}
 		},
 	}
@@ -102,7 +103,7 @@ func TestGetClientClientCallErr(t *testing.T) {
 				Args:        nil,
 				Done:        nil,
 				Err:         nil,
-				Body:        body([]string{"/org/freedesktop/GeoClue2/Client/10"}),
+				Body:        body("/org/freedesktop/GeoClue2/Client/10"),
 			}
 		},
 	}
@@ -146,7 +147,7 @@ func TestEnsureClient(t *testing.T) {
 				Args:        nil,
 				Done:        nil,
 				Err:         nil,
-				Body:        body([]string{"/org/freedesktop/GeoClue2/Client/10"}),
+				Body:        body("/org/freedesktop/GeoClue2/Client/10"),
 			}
 		},
 	}
@@ -197,4 +198,52 @@ func TestEnsureClient(t *testing.T) {
 	assert.NotNil(t, gc2.client)
 	assert.True(t, called)
 	assert.True(t, accessed)
+}
+
+//func getObjInto(intf string, obj dbus.BusObject, into interface{}) error
+func TestGetObjInto(t *testing.T) {
+	type Embed struct {
+		U1 uint64
+		U2 uint64
+	}
+	type Strct struct {
+		I     int     `dbus:"I"`
+		S     string  `dbus:"S"`
+		F     float64 `dbus:"F"`
+		E     Embed   `dbus:"E"`
+		NoTag string
+	}
+	strct1 := Strct{
+		I: 123456789,
+		S: "my-string",
+		F: math.Pi,
+		E: Embed{1, 2},
+	}
+	obj := MockBusObject{
+		DoCall: func(method string, flags dbus.Flags, args ...interface{}) *dbus.Call {
+			switch args[1] {
+			case "I":
+				return &dbus.Call{
+					Body: body(dbus.MakeVariant(strct1.I)),
+				}
+			case "S":
+				return &dbus.Call{
+					Body: body(dbus.MakeVariant(strct1.S)),
+				}
+			case "F":
+				return &dbus.Call{
+					Body: body(dbus.MakeVariant(strct1.F)),
+				}
+			case "E":
+				return &dbus.Call{
+					Body: body(dbus.MakeVariant(strct1.E)),
+				}
+			}
+			return nil
+		},
+	}
+	strct2 := Strct{}
+	err := getObjInto("", &obj, &strct2)
+	assert.NoError(t, err)
+	assert.Equal(t, strct1, strct2)
 }
