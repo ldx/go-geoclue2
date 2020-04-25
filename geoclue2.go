@@ -62,7 +62,7 @@ type Location struct {
 // GeoClue2 is used for receiving location information from the geoclue2
 // service.
 type GeoClue2 struct {
-	conn           *dbus.Conn
+	conn           DbusConn
 	desktopID      string
 	wg             sync.WaitGroup
 	quit           chan interface{}
@@ -79,7 +79,7 @@ func NewGeoClue2(conn *dbus.Conn, desktopID string) *GeoClue2 {
 		desktopID = defaultDesktopID
 	}
 	return &GeoClue2{
-		conn:        conn,
+		conn:        &RealDbusConn{conn: conn},
 		desktopID:   desktopID,
 		wg:          sync.WaitGroup{},
 		quit:        make(chan interface{}),
