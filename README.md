@@ -1,6 +1,6 @@
 # A Go library for Geoclue2
 
-https://github.com/ldx/go-geoclue2/workflows/run-tests/badge.svg
+![Status](https://github.com/ldx/go-geoclue2/workflows/Run%20tests/badge.svg)
 
 [Geoclue2](https://developer.gnome.org/platform-overview/unstable/tech-geoclue2.html.en) is a DBus service for providing geolocation services. This is a Go library for making it easy to get location information via Geoclue2.
 
