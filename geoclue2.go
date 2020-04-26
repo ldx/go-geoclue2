@@ -25,6 +25,15 @@ const (
 	managerPath       = "/org/freedesktop/GeoClue2/Manager"
 )
 
+// The timestamp when the location was determined, in seconds and microseconds
+// since the Epoch.
+type Timestamp struct {
+	// Seconds since the Epoch.
+	Seconds uint64
+	// Microseconds.
+	Microseconds uint64
+}
+
 // Location contains location information returned by geoclue2.
 type Location struct {
 	// The latitude of the location, in degrees.
@@ -56,7 +65,7 @@ type Location struct {
 	// timestamp will always monotonically increase, as a backend may not
 	// respect that. Also note that a timestamp can be very old, e.g. because
 	// of a cached location.
-	Timestamp []uint64 `dbus:"Timestamp"`
+	Timestamp Timestamp `dbus:"Timestamp"`
 }
 
 // GeoClue2 is used for receiving location information from the geoclue2
