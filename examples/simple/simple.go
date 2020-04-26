@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/godbus/dbus"
+	dbus "github.com/godbus/dbus/v5"
 	"github.com/ldx/go-geoclue2"
 	"k8s.io/klog"
 )
