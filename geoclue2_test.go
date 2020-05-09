@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	dbus "github.com/godbus/dbus/v5"
 	"github.com/stretchr/testify/assert"
@@ -246,4 +248,140 @@ func TestGetObjInto(t *testing.T) {
 	err := getObjInto("", &obj, &strct2)
 	assert.NoError(t, err)
 	assert.Equal(t, strct1, strct2)
+}
+
+func dbusCall(x interface{}) *dbus.Call {
+	body := make([]interface{}, 1)
+	body[0] = x
+	return &dbus.Call{
+		Body: body,
+	}
+}
+
+func mockDbusConn(t *testing.T, manager *MockBusObject, client *MockBusObject, location *MockBusObject) *MockDbusConn {
+	if manager == nil {
+		manager = &MockBusObject{
+			DoCall: func(method string, flags dbus.Flags, args ...interface{}) *dbus.Call {
+				return &dbus.Call{
+					Destination: "org.freedesktop.GeoClue2",
+					Path:        "/org/freedesktop/GeoClue2/Manager",
+					Method:      "GetClient",
+					Body:        body("/org/freedesktop/GeoClue2/Client/10"),
+				}
+			},
+		}
+	}
+	if client == nil {
+		client = &MockBusObject{
+			DoCall: func(method string, flags dbus.Flags, args ...interface{}) *dbus.Call {
+				return &dbus.Call{}
+			},
+			DoGetProperty: func(p string) (dbus.Variant, error) {
+				if p == clientLocation {
+					return dbus.MakeVariant(dbus.ObjectPath("location-path")), nil
+				}
+				return dbus.MakeVariant(true), nil
+			},
+		}
+	}
+	if location == nil {
+		location = &MockBusObject{
+			DoCall: func(method string, flags dbus.Flags, args ...interface{}) *dbus.Call {
+				if len(args) < 2 {
+					return &dbus.Call{}
+				}
+				switch args[1].(string) {
+				case "Latitude":
+					return dbusCall(1.23)
+				case "Longitude":
+					return dbusCall(1.23)
+				case "Accuracy":
+					return dbusCall(1.23)
+				case "Altitude":
+					return dbusCall(1.23)
+				case "Speed":
+					return dbusCall(1.23)
+				case "Heading":
+					return dbusCall(1.23)
+				case "Description":
+					return dbusCall("")
+				case "Timestamp":
+					now := time.Now().UnixNano()
+					seconds := now / int64(time.Second)
+					microseconds := (now - seconds*int64(time.Second)) / int64(time.Microsecond)
+					return dbusCall(Timestamp{
+						Seconds:      uint64(seconds),
+						Microseconds: uint64(microseconds),
+					})
+				}
+				return &dbus.Call{}
+			},
+			DoGetProperty: func(p string) (dbus.Variant, error) {
+				return dbus.MakeVariant(true), nil
+			},
+		}
+	}
+	conn := &MockDbusConn{
+		DoObject: func(iface string, path dbus.ObjectPath) dbus.BusObject {
+			if path == managerPath {
+				return manager
+			} else if strings.HasPrefix(string(path), clientPathPrefix) {
+				return client
+			} else if path == "location-path" {
+				return location
+			}
+			t.Error(fmt.Sprintf("invalid path %q", path))
+			return nil
+		},
+		DoSignal: func(ch chan<- *dbus.Signal) {
+		},
+	}
+	return conn
+}
+
+func TestStartStop(t *testing.T) {
+	gc := GeoClue2{
+		conn:        mockDbusConn(t, nil, nil, nil),
+		wg:          sync.WaitGroup{},
+		quit:        make(chan interface{}),
+		dbus:        make(chan *dbus.Signal),
+		subscribe:   make(chan chan Location),
+		unsubscribe: make(chan chan Location),
+	}
+	gc.Start()
+	gc.Stop()
+}
+
+func TestLocationUpdated(t *testing.T) {
+	gc := GeoClue2{
+		conn:        mockDbusConn(t, nil, nil, nil),
+		wg:          sync.WaitGroup{},
+		quit:        make(chan interface{}),
+		dbus:        make(chan *dbus.Signal),
+		subscribe:   make(chan chan Location),
+		unsubscribe: make(chan chan Location),
+	}
+	gc.Start()
+	gc.dbus <- &dbus.Signal{
+		Name: locationUpdated,
+	}
+	gc.Stop()
+}
+
+func TestGetLocation(t *testing.T) {
+	gc := GeoClue2{
+		conn:        mockDbusConn(t, nil, nil, nil),
+		wg:          sync.WaitGroup{},
+		quit:        make(chan interface{}),
+		dbus:        make(chan *dbus.Signal),
+		subscribe:   make(chan chan Location),
+		unsubscribe: make(chan chan Location),
+	}
+	gc.Start()
+	gc.dbus <- &dbus.Signal{
+		Name: locationUpdated,
+	}
+	loc := gc.GetLatestLocation()
+	assert.NotNil(t, loc)
+	gc.Stop()
 }
