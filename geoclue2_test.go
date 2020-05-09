@@ -1,6 +1,7 @@
 package geoclue2
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strings"
@@ -383,5 +384,37 @@ func TestGetLocation(t *testing.T) {
 	}
 	loc := gc.GetLatestLocation()
 	assert.NotNil(t, loc)
+	gc.Stop()
+}
+
+func TestWaitForLocation(t *testing.T) {
+	gc := GeoClue2{
+		conn:        mockDbusConn(t, nil, nil, nil),
+		wg:          sync.WaitGroup{},
+		quit:        make(chan interface{}),
+		dbus:        make(chan *dbus.Signal),
+		subscribe:   make(chan chan Location),
+		unsubscribe: make(chan chan Location),
+	}
+	gc.Start()
+	quit := make(chan interface{})
+	go func() {
+		ticker := time.NewTicker(50 * time.Millisecond)
+		for {
+			select {
+			case <-quit:
+				ticker.Stop()
+				return
+			case <-ticker.C:
+				gc.dbus <- &dbus.Signal{
+					Name: locationUpdated,
+				}
+			}
+		}
+	}()
+	loc, err := gc.WaitForLocation(context.TODO())
+	quit <- struct{}{}
+	assert.NotNil(t, loc)
+	assert.NoError(t, err)
 	gc.Stop()
 }
